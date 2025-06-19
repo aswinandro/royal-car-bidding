@@ -28,20 +28,42 @@ export class AuctionService {
       throw new BadRequestException("End time must be after start time")
     }
 
-    // Check if car exists
-    const car = await this.prisma.car.findUnique({
-      where: { id: createAuctionDto.carId },
-    })
+    // For now, create a car record if carId is provided as car data
+    let carId = createAuctionDto.carId
 
-    if (!car) {
-      throw new NotFoundException(`Car with ID ${createAuctionDto.carId} not found`)
+    // If carId looks like it contains car data, create a new car
+    if (createAuctionDto.carId === "temp" || !createAuctionDto.carId) {
+      // Extract car data from DTO (assuming it's passed in the request)
+      const carData = createAuctionDto as any
+      const car = await this.prisma.car.create({
+        data: {
+          make: carData.make || "Unknown",
+          model: carData.model || "Unknown",
+          year: carData.year || new Date().getFullYear(),
+          description: carData.description || "No description",
+          imageUrl: carData.imageUrl || null,
+        },
+      })
+      carId = car.id
+    } else {
+      // Check if car exists
+      const car = await this.prisma.car.findUnique({
+        where: { id: carId },
+      })
+
+      if (!car) {
+        throw new NotFoundException(`Car with ID ${carId} not found`)
+      }
     }
 
     // Create auction
     const auction = await this.prisma.auction.create({
       data: {
-        ...createAuctionDto,
+        carId,
         ownerId: userId,
+        startTime,
+        endTime,
+        startingBid: createAuctionDto.startingBid,
         status: startTime <= new Date() ? "ACTIVE" : "PENDING",
       },
       include: {
@@ -58,10 +80,15 @@ export class AuctionService {
     // Publish auction created event
     await this.rabbitMQService.publishBidEvent("auction.created", {
       auctionId: auction.id,
-      carId: auction.carId,
-      startTime: auction.startTime,
-      endTime: auction.endTime,
-      startingBid: auction.startingBid,
+      eventType: "created" as const,
+      data: {
+        carId: auction.carId,
+        startTime: auction.startTime,
+        endTime: auction.endTime,
+        startingBid: auction.startingBid,
+      },
+      timestamp: new Date().toISOString(),
+      userId,
     })
 
     return auction
@@ -173,10 +200,15 @@ export class AuctionService {
     // Publish auction updated event
     await this.rabbitMQService.publishBidEvent("auction.updated", {
       auctionId: updatedAuction.id,
-      carId: updatedAuction.carId,
-      startTime: updatedAuction.startTime,
-      endTime: updatedAuction.endTime,
-      startingBid: updatedAuction.startingBid,
+      eventType: "updated" as const,
+      data: {
+        carId: updatedAuction.carId,
+        startTime: updatedAuction.startTime,
+        endTime: updatedAuction.endTime,
+        startingBid: updatedAuction.startingBid,
+      },
+      timestamp: new Date().toISOString(),
+      userId,
     })
 
     return updatedAuction
@@ -208,6 +240,12 @@ export class AuctionService {
     // Publish auction deleted event
     await this.rabbitMQService.publishBidEvent("auction.deleted", {
       auctionId: deletedAuction.id,
+      eventType: "deleted" as const,
+      data: {
+        auctionId: deletedAuction.id,
+      },
+      timestamp: new Date().toISOString(),
+      userId,
     })
 
     return deletedAuction
@@ -239,6 +277,11 @@ export class AuctionService {
     // Publish auction started event
     await this.rabbitMQService.publishBidEvent("auction.started", {
       auctionId: updatedAuction.id,
+      eventType: "started" as const,
+      data: {
+        auctionId: updatedAuction.id,
+      },
+      timestamp: new Date().toISOString(),
     })
 
     return updatedAuction
@@ -293,8 +336,13 @@ export class AuctionService {
     // Publish auction ended event
     await this.rabbitMQService.publishBidEvent("auction.ended", {
       auctionId: updatedAuction.id,
-      winnerId: updatedAuction.winnerId,
-      winningBid: updatedAuction.currentBid,
+      eventType: "ended" as const,
+      data: {
+        auctionId: updatedAuction.id,
+        winnerId: updatedAuction.winnerId,
+        winningBid: updatedAuction.currentBid,
+      },
+      timestamp: new Date().toISOString(),
     })
 
     // Clear Redis cache for this auction

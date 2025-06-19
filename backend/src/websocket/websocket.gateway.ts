@@ -2,26 +2,32 @@ import {
   WebSocketGateway,
   WebSocketServer,
   SubscribeMessage,
+  MessageBody,
+  ConnectedSocket,
   type OnGatewayConnection,
   type OnGatewayDisconnect,
   type OnGatewayInit,
   WsException,
 } from "@nestjs/websockets"
 import type { Server, Socket } from "socket.io"
-import { Logger, UseGuards } from "@nestjs/common"
-import type { RedisService } from "../redis/redis.service"
+import { Logger, UseGuards, UsePipes, ValidationPipe } from "@nestjs/common"
 import type { JwtService } from "@nestjs/jwt"
 import type { ConfigService } from "@nestjs/config"
 import { WsJwtGuard } from "./guards/ws-jwt.guard"
 import { WsThrottlerGuard } from "./guards/ws-throttler.guard"
+import { AuctionRoomGuard } from "./guards/auction-room.guard"
+import type { WebSocketService } from "./websocket.service"
+import type { AuctionRoomService } from "./services/auction-room.service"
+import { BidValidationPipe } from "./pipes/bid-validation.pipe"
+import type { JoinRoomDto, PlaceBidDto, LeaveRoomDto } from "./dto/websocket.dto"
 
 @WebSocketGateway({
   cors: {
     origin: (origin, callback) => {
       const allowedOrigins = [
         process.env.FRONTEND_URL || "http://localhost:5173",
-        "http://localhost:3000", // Additional fallback
-        "http://localhost:5173", // Vite default
+        "http://localhost:3000",
+        "http://localhost:5173",
       ]
       if (!origin || allowedOrigins.includes(origin)) {
         callback(null, true)
@@ -31,6 +37,7 @@ import { WsThrottlerGuard } from "./guards/ws-throttler.guard"
     },
     credentials: true,
   },
+  namespace: "/auctions",
 })
 export class WebsocketGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
   private readonly logger = new Logger(WebsocketGateway.name)
@@ -39,109 +46,284 @@ export class WebsocketGateway implements OnGatewayInit, OnGatewayConnection, OnG
   server: Server
 
   constructor(
-    private readonly redisService: RedisService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly websocketService: WebSocketService,
+    private readonly auctionRoomService: AuctionRoomService,
   ) {}
 
   afterInit(server: Server) {
     this.logger.log("WebSocket Gateway initialized")
+    this.websocketService.setServer(server)
+
+    // Initialize auction room management
+    this.auctionRoomService.initialize(server)
+
     this.logger.log(`CORS allowed origins: ${this.configService.get("FRONTEND_URL") || "http://localhost:5173"}`)
-
-    // Subscribe to Redis channels for real-time updates
-    this.redisService.subscribe("auction:bid", (message) => {
-      try {
-        const data = JSON.parse(message)
-        this.server.to(`auction:${data.auctionId}`).emit("bidPlaced", data)
-      } catch (error) {
-        this.logger.error("Error processing Redis message", error)
-      }
-    })
-
-    this.redisService.subscribe("auction:status", (message) => {
-      try {
-        const data = JSON.parse(message)
-        this.server.to(`auction:${data.auctionId}`).emit("auctionUpdate", data)
-      } catch (error) {
-        this.logger.error("Error processing Redis message", error)
-      }
-    })
   }
 
-  handleConnection(client: Socket) {
-    this.logger.log(`Client connected: ${client.id}`)
-
-    // Authenticate client
-    const token = client.handshake.auth.token || client.handshake.headers.authorization?.split(" ")[1]
-
-    if (!token) {
-      this.logger.warn(`Client ${client.id} not authenticated`)
-      return
-    }
-
+  async handleConnection(client: Socket) {
     try {
+      this.logger.log(`Client attempting connection: ${client.id}`)
+
+      // Authenticate client
+      const token = client.handshake.auth.token || client.handshake.headers.authorization?.split(" ")[1]
+
+      if (!token) {
+        this.logger.warn(`Client ${client.id} not authenticated`)
+        client.disconnect()
+        return
+      }
+
       const payload = this.jwtService.verify(token)
       client.data.user = payload
+
+      // Register client with WebSocket service
+      await this.websocketService.registerClient(client, payload)
+
       this.logger.log(`Client ${client.id} authenticated as user ${payload.sub}`)
+
+      // Send connection confirmation
+      client.emit("connected", {
+        message: "Successfully connected to auction system",
+        userId: payload.sub,
+        timestamp: new Date().toISOString(),
+      })
     } catch (error) {
-      this.logger.warn(`Client ${client.id} provided invalid token`)
+      this.logger.error(`Authentication failed for client ${client.id}:`, error.message)
+      client.emit("error", { message: "Authentication failed" })
+      client.disconnect()
     }
   }
 
-  handleDisconnect(client: Socket) {
-    this.logger.log(`Client disconnected: ${client.id}`)
+  async handleDisconnect(client: Socket) {
+    this.logger.log(`Client disconnecting: ${client.id}`)
 
-    // Leave all rooms
-    for (const room of client.rooms) {
-      if (room !== client.id) {
-        client.leave(room)
-      }
+    try {
+      // Clean up client from all rooms and services
+      await this.websocketService.unregisterClient(client)
+      await this.auctionRoomService.removeClientFromAllRooms(client)
+
+      this.logger.log(`Client ${client.id} cleanup completed`)
+    } catch (error) {
+      this.logger.error(`Error during client ${client.id} cleanup:`, error)
     }
   }
 
+  @UseGuards(WsJwtGuard)
+  @UsePipes(new ValidationPipe({ transform: true }))
   @SubscribeMessage("joinAuction")
-  handleJoinAuction(client: Socket, auctionId: string) {
-    this.logger.log(`Client ${client.id} joining auction room: ${auctionId}`)
-    client.join(`auction:${auctionId}`)
-    return { event: "joinedAuction", data: { auctionId } }
-  }
+  async handleJoinAuction(client: Socket, data: JoinRoomDto) {
+    try {
+      const { auctionId } = data
+      const userId = client.data.user.sub
 
-  @SubscribeMessage("leaveAuction")
-  handleLeaveAuction(client: Socket, auctionId: string) {
-    this.logger.log(`Client ${client.id} leaving auction room: ${auctionId}`)
-    client.leave(`auction:${auctionId}`)
-    return { event: "leftAuction", data: { auctionId } }
-  }
+      this.logger.log(`User ${userId} joining auction room: ${auctionId}`)
 
-  @UseGuards(WsJwtGuard, WsThrottlerGuard)
-  @SubscribeMessage("placeBid")
-  handlePlaceBid(client: Socket, data: { auctionId: string; amount: number }) {
-    if (!client.data.user) {
-      throw new WsException("Unauthorized")
+      // Join auction room with validation
+      const roomInfo = await this.auctionRoomService.joinAuctionRoom(client, auctionId, userId)
+
+      // Send room information to client
+      client.emit("joinedAuction", {
+        auctionId,
+        roomInfo,
+        timestamp: new Date().toISOString(),
+      })
+
+      // Notify other room members
+      client.to(`auction:${auctionId}`).emit("userJoined", {
+        userId,
+        username: client.data.user.email,
+        participantCount: roomInfo.participantCount,
+        timestamp: new Date().toISOString(),
+      })
+
+      return { success: true, roomInfo }
+    } catch (error) {
+      this.logger.error(`Error joining auction room:`, error)
+      throw new WsException(error.message || "Failed to join auction room")
     }
-
-    this.logger.log(`Bid attempt from ${client.data.user.sub} for auction ${data.auctionId}: $${data.amount}`)
-    return { event: "bidReceived", data: { auctionId: data.auctionId } }
   }
 
-  broadcastBidUpdate(auctionId: string, bid: any) {
-    this.server.to(`auction:${auctionId}`).emit("bidPlaced", bid)
+  @UseGuards(WsJwtGuard)
+  @UsePipes(new ValidationPipe({ transform: true }))
+  @SubscribeMessage("leaveAuction")
+  async handleLeaveAuction(client: Socket, @MessageBody() data: LeaveRoomDto) {
+    try {
+      const { auctionId } = data
+      const userId = client.data.user.sub
+
+      this.logger.log(`User ${userId} leaving auction room: ${auctionId}`)
+
+      // Leave auction room
+      await this.auctionRoomService.leaveAuctionRoom(client, auctionId, userId)
+
+      // Notify other room members
+      client.to(`auction:${auctionId}`).emit("userLeft", {
+        userId,
+        username: client.data.user.email,
+        timestamp: new Date().toISOString(),
+      })
+
+      client.emit("leftAuction", {
+        auctionId,
+        timestamp: new Date().toISOString(),
+      })
+
+      return { success: true }
+    } catch (error) {
+      this.logger.error(`Error leaving auction room:`, error)
+      throw new WsException(error.message || "Failed to leave auction room")
+    }
   }
 
-  broadcastAuctionUpdate(auctionId: string, status: string) {
-    this.server.to(`auction:${auctionId}`).emit("auctionUpdate", {
-      auctionId,
-      status,
-      timestamp: new Date(),
-    })
+  @UseGuards(WsJwtGuard, WsThrottlerGuard, AuctionRoomGuard)
+  @UsePipes(new BidValidationPipe())
+  @SubscribeMessage("placeBid")
+  async handlePlaceBid(@ConnectedSocket() client: Socket, @MessageBody() data: PlaceBidDto) {
+    try {
+      const { auctionId, amount } = data
+      const userId = client.data.user.sub
+
+      this.logger.log(`Bid attempt from ${userId} for auction ${auctionId}: $${amount}`)
+
+      // Process bid through auction room service
+      const bidResult = await this.auctionRoomService.processBid(client, auctionId, userId, amount)
+
+      // Broadcast bid to all room participants
+      this.server.to(`auction:${auctionId}`).emit("bidPlaced", {
+        bidId: bidResult.bid.id,
+        auctionId,
+        userId,
+        username: client.data.user.email,
+        amount,
+        timestamp: bidResult.bid.createdAt,
+        isHighest: true,
+        previousHighest: bidResult.previousHighest,
+      })
+
+      // Send confirmation to bidder
+      client.emit("bidConfirmed", {
+        bidId: bidResult.bid.id,
+        amount,
+        position: bidResult.position,
+        timestamp: bidResult.bid.createdAt,
+      })
+
+      return { success: true, bid: bidResult.bid }
+    } catch (error) {
+      this.logger.error(`Bid placement error:`, error)
+
+      // Send error to client
+      client.emit("bidError", {
+        auctionId: data.auctionId,
+        error: error.message,
+        timestamp: new Date().toISOString(),
+      })
+
+      throw new WsException(error.message || "Failed to place bid")
+    }
   }
 
-  broadcastAuctionEnd(auctionId: string, winnerId: string, winningBid: number) {
-    this.server.to(`auction:${auctionId}`).emit("auctionEnded", {
-      auctionId,
-      winnerId,
-      winningBid,
-      timestamp: new Date(),
-    })
+  @UseGuards(WsJwtGuard)
+  @SubscribeMessage("getAuctionStatus")
+  async handleGetAuctionStatus(@ConnectedSocket() client: Socket, @MessageBody() data: { auctionId: string }) {
+    try {
+      const status = await this.auctionRoomService.getAuctionStatus(data.auctionId)
+
+      client.emit("auctionStatus", {
+        auctionId: data.auctionId,
+        status,
+        timestamp: new Date().toISOString(),
+      })
+
+      return { success: true, status }
+    } catch (error) {
+      this.logger.error(`Error getting auction status:`, error)
+      throw new WsException(error.message || "Failed to get auction status")
+    }
+  }
+
+  @UseGuards(WsJwtGuard)
+  @SubscribeMessage("getRoomParticipants")
+  async handleGetRoomParticipants(@ConnectedSocket() client: Socket, @MessageBody() data: { auctionId: string }) {
+    try {
+      const participants = await this.auctionRoomService.getRoomParticipants(data.auctionId)
+
+      client.emit("roomParticipants", {
+        auctionId: data.auctionId,
+        participants,
+        count: participants.length,
+        timestamp: new Date().toISOString(),
+      })
+
+      return { success: true, participants }
+    } catch (error) {
+      this.logger.error(`Error getting room participants:`, error)
+      throw new WsException(error.message || "Failed to get room participants")
+    }
+  }
+
+  // Admin methods for auction management
+  @UseGuards(WsJwtGuard)
+  @SubscribeMessage("startAuction")
+  async handleStartAuction(@ConnectedSocket() client: Socket, @MessageBody() data: { auctionId: string }) {
+    try {
+      // Verify user is auction owner or admin
+      const canStart = await this.auctionRoomService.canUserStartAuction(data.auctionId, client.data.user.sub)
+
+      if (!canStart) {
+        throw new WsException("Unauthorized to start this auction")
+      }
+
+      await this.auctionRoomService.startAuction(data.auctionId)
+
+      // Broadcast to all room participants
+      this.server.to(`auction:${data.auctionId}`).emit("auctionStarted", {
+        auctionId: data.auctionId,
+        startedBy: client.data.user.sub,
+        timestamp: new Date().toISOString(),
+      })
+
+      return { success: true }
+    } catch (error) {
+      this.logger.error(`Error starting auction:`, error)
+      throw new WsException(error.message || "Failed to start auction")
+    }
+  }
+
+  @UseGuards(WsJwtGuard)
+  @SubscribeMessage("endAuction")
+  async handleEndAuction(@ConnectedSocket() client: Socket, @MessageBody() data: { auctionId: string }) {
+    try {
+      // Verify user is auction owner or admin
+      const canEnd = await this.auctionRoomService.canUserEndAuction(data.auctionId, client.data.user.sub)
+
+      if (!canEnd) {
+        throw new WsException("Unauthorized to end this auction")
+      }
+
+      const result = await this.auctionRoomService.endAuction(data.auctionId)
+
+      // Broadcast to all room participants
+      this.server.to(`auction:${data.auctionId}`).emit("auctionEnded", {
+        auctionId: data.auctionId,
+        winner: result.winner,
+        winningBid: result.currentBid,
+        endedBy: client.data.user.sub,
+        timestamp: new Date().toISOString(),
+      })
+
+      return { success: true, result }
+    } catch (error) {
+      this.logger.error(`Error ending auction:`, error)
+      throw new WsException(error.message || "Failed to end auction")
+    }
+  }
+
+  broadcastBidUpdate(auctionId: string, bidData: any): void {
+    if (this.server) {
+      this.server.to(`auction:${auctionId}`).emit("bidPlaced", bidData)
+    }
   }
 }

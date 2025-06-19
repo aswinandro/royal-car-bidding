@@ -16,9 +16,10 @@ model User {
   updatedAt DateTime @updatedAt
 
   // Relations
-  bids     Bid[]
-  auctions Auction[] @relation("AuctionOwner")
+  bids        Bid[]
+  auctions    Auction[] @relation("AuctionOwner")
   wonAuctions Auction[] @relation("AuctionWinner")
+  auditLogs   AuditLog[]
 }
 
 model Car {
@@ -36,23 +37,28 @@ model Car {
 }
 
 model Auction {
-  id            String    @id @default(uuid())
-  carId         String
-  ownerId       String
-  startTime     DateTime
-  endTime       DateTime
-  startingBid   Float
-  currentBid    Float?
-  winnerId      String?
-  status        String    @default("PENDING") // PENDING, ACTIVE, ENDED
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id          String    @id @default(uuid())
+  carId       String
+  ownerId     String
+  startTime   DateTime
+  endTime     DateTime
+  startingBid Float
+  currentBid  Float?
+  winnerId    String?
+  status      String    @default("PENDING") // PENDING, ACTIVE, ENDED
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   // Relations
-  car           Car       @relation(fields: [carId], references: [id])
-  owner         User      @relation("AuctionOwner", fields: [ownerId], references: [id])
-  winner        User?     @relation("AuctionWinner", fields: [winnerId], references: [id])
-  bids          Bid[]
+  car       Car       @relation(fields: [carId], references: [id], onDelete: Cascade)
+  owner     User      @relation("AuctionOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  winner    User?     @relation("AuctionWinner", fields: [winnerId], references: [id])
+  bids      Bid[]
+  auditLogs AuditLog[]
+
+  @@index([status])
+  @@index([startTime])
+  @@index([endTime])
 }
 
 model Bid {
@@ -63,6 +69,34 @@ model Bid {
   createdAt DateTime @default(now())
 
   // Relations
-  user      User     @relation(fields: [userId], references: [id])
-  auction   Auction  @relation(fields: [auctionId], references: [id])
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  auction   Auction   @relation(fields: [auctionId], references: [id], onDelete: Cascade)
+  auditLogs AuditLog[]
+
+  @@index([auctionId])
+  @@index([userId])
+  @@index([amount])
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  eventType String
+  userId    String?
+  auctionId String?
+  bidId     String?
+  data      Json
+  timestamp DateTime
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  // Relations
+  user    User?    @relation(fields: [userId], references: [id])
+  auction Auction? @relation(fields: [auctionId], references: [id])
+  bid     Bid?     @relation(fields: [bidId], references: [id])
+
+  @@index([eventType])
+  @@index([userId])
+  @@index([auctionId])
+  @@index([timestamp])
 }

@@ -9,11 +9,12 @@ import { RedisService } from "./redis.service"
     {
       provide: RedisService,
       useFactory: (configService: ConfigService) => {
-        return new RedisService({
+        const redisConfig = {
           host: configService.get("REDIS_HOST", "localhost"),
           port: configService.get("REDIS_PORT", 6379),
           password: configService.get("REDIS_PASSWORD", ""),
-        })
+        }
+        return new RedisService(redisConfig)
       },
       inject: [ConfigService],
     },

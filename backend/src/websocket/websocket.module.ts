@@ -1,5 +1,7 @@
 import { Module } from "@nestjs/common"
 import { WebsocketGateway } from "./websocket.gateway"
+import { WebSocketService } from "./websocket.service"
+import { AuctionRoomService } from "./services/auction-room.service"
 import { RedisModule } from "../redis/redis.module"
 import { AuctionModule } from "../auction/auction.module"
 import { BidModule } from "../bid/bid.module"
@@ -19,7 +21,7 @@ import { ConfigModule, ConfigService } from "@nestjs/config"
       }),
     }),
   ],
-  providers: [WebsocketGateway],
-  exports: [WebsocketGateway],
+  providers: [WebsocketGateway, WebSocketService, AuctionRoomService],
+  exports: [WebsocketGateway, WebSocketService, AuctionRoomService],
 })
 export class WebsocketModule {}

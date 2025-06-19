@@ -76,7 +76,7 @@ export class BidService {
         userId,
         auctionId: createBidDto.auctionId,
         amount: createBidDto.amount,
-        timestamp: bid.createdAt,
+        timestamp: bid.createdAt.toISOString(),
       })
 
       return bid
