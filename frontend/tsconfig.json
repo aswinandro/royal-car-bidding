@@ -24,8 +24,11 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]
-    }
+    },
+
+    /* Types */
+    "types": ["vite/client", "node"]
   },
-  "include": ["src"],
-  "references": [{ "path": "./tsconfig.node.json" }]
+  "include": ["src", "src/**/*", "src/vite-env.d.ts"],
+  "exclude": ["node_modules", "dist", "dist-node", "vite.config.ts", "postcss.config.mjs"]
 }

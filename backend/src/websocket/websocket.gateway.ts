@@ -28,6 +28,7 @@ import type { JoinRoomDto, PlaceBidDto, LeaveRoomDto } from "./dto/websocket.dto
         process.env.FRONTEND_URL || "http://localhost:5173",
         "http://localhost:3000",
         "http://localhost:5173",
+        "http://localhost:3001",
       ]
       if (!origin || allowedOrigins.includes(origin)) {
         callback(null, true)
@@ -37,7 +38,8 @@ import type { JoinRoomDto, PlaceBidDto, LeaveRoomDto } from "./dto/websocket.dto
     },
     credentials: true,
   },
-  namespace: "/auctions",
+  namespace: "/",
+  transports: ["websocket", "polling"],
 })
 export class WebsocketGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
   private readonly logger = new Logger(WebsocketGateway.name)
@@ -59,7 +61,8 @@ export class WebsocketGateway implements OnGatewayInit, OnGatewayConnection, OnG
     // Initialize auction room management
     this.auctionRoomService.initialize(server)
 
-    this.logger.log(`CORS allowed origins: ${this.configService.get("FRONTEND_URL") || "http://localhost:5173"}`)
+    const frontendUrl = this.configService.get("FRONTEND_URL") || "http://localhost:5173"
+    this.logger.log(`CORS allowed origins: ${frontendUrl}`)
   }
 
   async handleConnection(client: Socket) {
@@ -148,7 +151,7 @@ export class WebsocketGateway implements OnGatewayInit, OnGatewayConnection, OnG
   @UseGuards(WsJwtGuard)
   @UsePipes(new ValidationPipe({ transform: true }))
   @SubscribeMessage("leaveAuction")
-  async handleLeaveAuction(client: Socket, @MessageBody() data: LeaveRoomDto) {
+  async handleLeaveAuction(client: Socket, data: LeaveRoomDto) {
     try {
       const { auctionId } = data
       const userId = client.data.user.sub

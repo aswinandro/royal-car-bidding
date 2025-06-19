@@ -31,7 +31,10 @@ function App() {
               {/* Development info */}
               {config.isDevelopment && (
                 <div className="fixed bottom-4 right-4 bg-black text-white text-xs p-2 rounded opacity-50">
-                  API: {config.apiUrl} | WS: {config.wsUrl}
+                  <div>API: {config.apiUrl}</div>
+                  <div>WS: {config.wsUrl}</div>
+                  <div>Mode: {config.mode}</div>
+                  <div>Version: {config.appVersion}</div>
                 </div>
               )}
             </div>

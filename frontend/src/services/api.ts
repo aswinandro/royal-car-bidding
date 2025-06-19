@@ -22,26 +22,35 @@ class ApiService {
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`
 
-    const headers: HeadersInit = {
+    const headers: Record<string, string> = {
       "Content-Type": "application/json",
-      ...options.headers,
+      ...(options.headers as Record<string, string>),
     }
 
     if (this.token) {
-      headers.Authorization = `Bearer ${this.token}`
+      headers["Authorization"] = `Bearer ${this.token}`
     }
 
-    const response = await fetch(url, {
-      ...options,
-      headers,
-    })
+    try {
+      const response = await fetch(url, {
+        ...options,
+        headers,
+      })
 
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ message: "Network error" }))
-      throw new Error(error.message || `HTTP ${response.status}`)
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({
+          message: `HTTP ${response.status}: ${response.statusText}`,
+        }))
+        throw new Error(error.message || `HTTP ${response.status}`)
+      }
+
+      return response.json()
+    } catch (error) {
+      if (error instanceof Error) {
+        throw error
+      }
+      throw new Error("Network error occurred")
     }
-
-    return response.json()
   }
 
   // Auth endpoints
@@ -76,6 +85,31 @@ class ApiService {
     })
   }
 
+  async updateAuction(id: string, data: any) {
+    return this.request<any>(`/auctions/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    })
+  }
+
+  async deleteAuction(id: string) {
+    return this.request<any>(`/auctions/${id}`, {
+      method: "DELETE",
+    })
+  }
+
+  async startAuction(id: string) {
+    return this.request<any>(`/auctions/${id}/start`, {
+      method: "POST",
+    })
+  }
+
+  async endAuction(id: string) {
+    return this.request<any>(`/auctions/${id}/end`, {
+      method: "POST",
+    })
+  }
+
   // Bid endpoints
   async placeBid(auctionId: string, amount: number) {
     return this.request<any>("/bids", {
@@ -90,6 +124,33 @@ class ApiService {
 
   async getHighestBid(auctionId: string) {
     return this.request<any>(`/bids/auction/${auctionId}/highest`)
+  }
+
+  // User endpoints
+  async getUsers() {
+    return this.request<any[]>("/users")
+  }
+
+  async getUser(id: string) {
+    return this.request<any>(`/users/${id}`)
+  }
+
+  async updateUser(id: string, data: any) {
+    return this.request<any>(`/users/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    })
+  }
+
+  async deleteUser(id: string) {
+    return this.request<any>(`/users/${id}`, {
+      method: "DELETE",
+    })
+  }
+
+  // Health check
+  async healthCheck() {
+    return this.request<any>("/health")
   }
 }
 

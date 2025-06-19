@@ -16,13 +16,15 @@ import { LocalStrategy } from "./strategies/local.strategy"
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
-        secret: configService.get("JWT_SECRET", "secret"),
-        signOptions: { expiresIn: "1d" },
+        secret: configService.get("JWT_SECRET") || "fallback-secret-key",
+        signOptions: {
+          expiresIn: configService.get("JWT_EXPIRES_IN") || "1d",
+        },
       }),
     }),
   ],
   controllers: [AuthController],
   providers: [AuthService, JwtStrategy, LocalStrategy],
-  exports: [AuthService],
+  exports: [AuthService, JwtModule],
 })
 export class AuthModule {}

@@ -14,13 +14,15 @@ import { AuthModule } from "./auth/auth.module"
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+      envFilePath: [".env.local", ".env"],
+      cache: true,
     }),
     ThrottlerModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
-        ttl: config.get("THROTTLE_TTL", 60),
-        limit: config.get("THROTTLE_LIMIT", 10),
+      useFactory: (configService: ConfigService) => ({
+        ttl: Number(configService.get("THROTTLE_TTL", "60")),
+        limit: Number(configService.get("THROTTLE_LIMIT", "10")),
       }),
     }),
     PrismaModule,
