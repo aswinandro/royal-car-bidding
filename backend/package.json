@@ -1,8 +1,8 @@
 {
-  "name": "car-auction-backend",
+  "name": "car-bidding-backend",
   "version": "0.0.1",
-  "description": "Car auction system backend with real-time bidding",
-  "author": "Car Auction Team",
+  "description": "Royal Car auction system backend with real-time bidding",
+  "author": "Aswin Andro",
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
