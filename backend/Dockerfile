@@ -24,7 +24,4 @@ COPY --from=builder /app/dist ./dist
 
 EXPOSE 3001
 
-# Debug line - optional
-# RUN ls -al /app/dist
-
-CMD ["node", "dist/main"]
+CMD ["node", "dist/main.js"]
