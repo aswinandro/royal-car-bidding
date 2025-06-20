@@ -23,16 +23,23 @@ export function CreateAuctionPage() {
     endTime: "",
     startingBid: "",
   })
+
   const [loading, setLoading] = useState(false)
 
   const { user } = useAuth()
   const { toast } = useToast()
   const navigate = useNavigate()
 
+  // Fix: define form field keys for TS safety
+  type FormField = keyof typeof formData
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const name = e.target.name as FormField
+    const value = e.target.value
+
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value,
+      [name]: value,
     })
   }
 
@@ -48,7 +55,7 @@ export function CreateAuctionPage() {
       return
     }
 
-    const requiredFields = ["make", "model", "year", "description", "startTime", "endTime", "startingBid"]
+    const requiredFields: FormField[] = ["make", "model", "year", "description", "startTime", "endTime", "startingBid"]
     const missingFields = requiredFields.filter((field) => !formData[field])
 
     if (missingFields.length > 0) {
