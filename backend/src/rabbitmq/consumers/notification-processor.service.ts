@@ -1,6 +1,6 @@
 import { Injectable, Logger, type OnModuleInit } from "@nestjs/common"
-import type { RabbitMQService, NotificationMessage } from "../rabbitmq.service"
-import type { WebsocketGateway } from "../../websocket/websocket.gateway"
+import { RabbitMQService, NotificationMessage } from "../rabbitmq.service"
+import { WebsocketGateway } from "../../websocket/websocket.gateway"
 
 @Injectable()
 export class NotificationProcessorService implements OnModuleInit {

@@ -1,8 +1,8 @@
 import { Injectable, BadRequestException, NotFoundException, Logger } from "@nestjs/common"
-import type { PrismaService } from "../prisma/prisma.service"
-import type { RedisService } from "../redis/redis.service"
-import type { RabbitMQService } from "../rabbitmq/rabbitmq.service"
-import type { CreateBidDto } from "./dto/create-bid.dto"
+import { PrismaService } from "../prisma/prisma.service"
+import { RedisService } from "../redis/redis.service"
+import { RabbitMQService } from "../rabbitmq/rabbitmq.service"
+import { CreateBidDto } from "./dto/create-bid.dto"
 
 @Injectable()
 export class BidService {

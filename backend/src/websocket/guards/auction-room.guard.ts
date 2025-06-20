@@ -1,7 +1,7 @@
 import { type CanActivate, type ExecutionContext, Injectable, Logger } from "@nestjs/common"
 import { WsException } from "@nestjs/websockets"
-import type { Socket } from "socket.io"
-import type { PrismaService } from "../../prisma/prisma.service"
+import { Socket } from "socket.io"
+import { PrismaService } from "../../prisma/prisma.service"
 
 @Injectable()
 export class AuctionRoomGuard implements CanActivate {

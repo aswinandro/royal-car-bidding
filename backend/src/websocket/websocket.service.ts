@@ -1,6 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common"
-import type { Server, Socket } from "socket.io"
-import type { RedisService } from "../redis/redis.service"
+import { Server, Socket } from "socket.io"
+import { RedisService } from "../redis/redis.service"
 
 interface ConnectedClient {
   socket: Socket

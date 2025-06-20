@@ -1,9 +1,9 @@
 import { Injectable, NotFoundException, BadRequestException, Logger } from "@nestjs/common"
-import type { PrismaService } from "../prisma/prisma.service"
-import type { RedisService } from "../redis/redis.service"
-import type { RabbitMQService } from "../rabbitmq/rabbitmq.service"
-import type { CreateAuctionDto } from "./dto/create-auction.dto"
-import type { UpdateAuctionDto } from "./dto/update-auction.dto"
+import { PrismaService } from "../prisma/prisma.service"
+import { RedisService } from "../redis/redis.service"
+import { RabbitMQService } from "../rabbitmq/rabbitmq.service"
+import { CreateAuctionDto } from "./dto/create-auction.dto"
+import { UpdateAuctionDto } from "./dto/update-auction.dto"
 
 @Injectable()
 export class AuctionService {

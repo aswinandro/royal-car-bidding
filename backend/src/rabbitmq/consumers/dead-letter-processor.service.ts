@@ -1,5 +1,5 @@
 import { Injectable, Logger, type OnModuleInit } from "@nestjs/common"
-import type { RabbitMQService } from "../rabbitmq.service"
+import { RabbitMQService } from "../rabbitmq.service"
 
 @Injectable()
 export class DeadLetterProcessorService implements OnModuleInit {

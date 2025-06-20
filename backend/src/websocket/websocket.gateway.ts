@@ -11,15 +11,15 @@ import {
 } from "@nestjs/websockets"
 import type { Server, Socket } from "socket.io"
 import { Logger, UseGuards, UsePipes, ValidationPipe } from "@nestjs/common"
-import type { JwtService } from "@nestjs/jwt"
-import type { ConfigService } from "@nestjs/config"
+import { JwtService } from "@nestjs/jwt"
+import { ConfigService } from "@nestjs/config"
 import { WsJwtGuard } from "./guards/ws-jwt.guard"
 import { WsThrottlerGuard } from "./guards/ws-throttler.guard"
 import { AuctionRoomGuard } from "./guards/auction-room.guard"
-import type { WebSocketService } from "./websocket.service"
-import type { AuctionRoomService } from "./services/auction-room.service"
+import { WebSocketService } from "./websocket.service"
+import { AuctionRoomService } from "./services/auction-room.service"
 import { BidValidationPipe } from "./pipes/bid-validation.pipe"
-import type { JoinRoomDto, PlaceBidDto, LeaveRoomDto } from "./dto/websocket.dto"
+import { JoinRoomDto, PlaceBidDto, LeaveRoomDto } from "./dto/websocket.dto"
 
 @WebSocketGateway({
   cors: {

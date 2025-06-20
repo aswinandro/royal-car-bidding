@@ -1,6 +1,6 @@
 import { Controller, Get, Post, Body, Param, UseGuards, Request } from "@nestjs/common"
-import type { BidService } from "./bid.service"
-import type { CreateBidDto } from "./dto/create-bid.dto"
+import { BidService } from "./bid.service"
+import { CreateBidDto } from "./dto/create-bid.dto"
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard"
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger"
 

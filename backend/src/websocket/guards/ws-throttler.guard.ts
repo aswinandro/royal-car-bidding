@@ -1,7 +1,7 @@
 import { type CanActivate, type ExecutionContext, Injectable, Logger } from "@nestjs/common"
 import { WsException } from "@nestjs/websockets"
-import type { Socket } from "socket.io"
-import type { RedisService } from "../../redis/redis.service"
+import { Socket } from "socket.io"
+import { RedisService } from "../../redis/redis.service"
 
 @Injectable()
 export class WsThrottlerGuard implements CanActivate {

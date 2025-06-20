@@ -1,7 +1,7 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Request, Query } from "@nestjs/common"
-import type { AuctionService } from "./auction.service"
-import type { CreateAuctionDto } from "./dto/create-auction.dto"
-import type { UpdateAuctionDto } from "./dto/update-auction.dto"
+import { AuctionService } from "./auction.service"
+import { CreateAuctionDto } from "./dto/create-auction.dto"
+import { UpdateAuctionDto } from "./dto/update-auction.dto"
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard"
 import { ApiBearerAuth, ApiTags, ApiQuery } from "@nestjs/swagger"
 

@@ -1,10 +1,10 @@
 import { Injectable, Logger, NotFoundException, BadRequestException } from "@nestjs/common"
-import type { Server, Socket } from "socket.io"
-import type { PrismaService } from "../../prisma/prisma.service"
-import type { RedisService } from "../../redis/redis.service"
-import type { BidService } from "../../bid/bid.service"
-import type { AuctionService } from "../../auction/auction.service"
-import type { WebSocketService } from "../websocket.service"
+import { Server, Socket } from "socket.io"
+import { PrismaService } from "../../prisma/prisma.service"
+import { RedisService } from "../../redis/redis.service"
+import { BidService } from "../../bid/bid.service"
+import { AuctionService } from "../../auction/auction.service"
+import { WebSocketService } from "../websocket.service"
 
 interface AuctionRoom {
   auctionId: string

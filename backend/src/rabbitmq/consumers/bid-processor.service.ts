@@ -1,9 +1,9 @@
 import { Injectable, Logger, type OnModuleInit } from "@nestjs/common"
-import type { RabbitMQService, BidMessage } from "../rabbitmq.service"
-import type { BidService } from "../../bid/bid.service"
-import type { WebsocketGateway } from "../../websocket/websocket.gateway"
-import type { RedisService } from "../../redis/redis.service"
-import type { SetOptions } from 'redis';
+import { RabbitMQService, BidMessage } from "../rabbitmq.service"
+import { BidService } from "../../bid/bid.service"
+import { WebsocketGateway } from "../../websocket/websocket.gateway"
+import { RedisService } from "../../redis/redis.service"
+import { SetOptions } from 'redis';
 
 @Injectable()
 export class BidProcessorService implements OnModuleInit {

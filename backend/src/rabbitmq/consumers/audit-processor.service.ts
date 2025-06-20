@@ -1,6 +1,6 @@
 import { Injectable, Logger, type OnModuleInit } from "@nestjs/common"
-import type { RabbitMQService, AuditMessage } from "../rabbitmq.service"
-import type { PrismaService } from "../../prisma/prisma.service"
+import { RabbitMQService, AuditMessage } from "../rabbitmq.service"
+import { PrismaService } from "../../prisma/prisma.service"
 
 @Injectable()
 export class AuditProcessorService implements OnModuleInit {
