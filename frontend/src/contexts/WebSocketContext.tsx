@@ -19,7 +19,7 @@ interface WebSocketContextType {
 const WebSocketContext = createContext<WebSocketContextType | undefined>(undefined)
 
 export function WebSocketProvider({ children }: { children: ReactNode }) {
-  const { token, user } = useAuth()
+  const { token} = useAuth()
 
   useEffect(() => {
     if (token) {
