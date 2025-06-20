@@ -3,6 +3,7 @@ import type { RabbitMQService, BidMessage } from "../rabbitmq.service"
 import type { BidService } from "../../bid/bid.service"
 import type { WebsocketGateway } from "../../websocket/websocket.gateway"
 import type { RedisService } from "../../redis/redis.service"
+import type { SetOptions } from 'redis';
 
 @Injectable()
 export class BidProcessorService implements OnModuleInit {
@@ -133,7 +134,10 @@ export class BidProcessorService implements OnModuleInit {
 
   private async acquireLock(key: string, ttl: number): Promise<boolean> {
     try {
-      const result = await this.redisService.getClient().set(key, "1", "PX", ttl, "NX")
+   const result = await this.redisService.getClient().set(key, "1", {
+  PX: ttl,
+  NX: true,
+});
       return result === "OK"
     } catch (error) {
       this.logger.error(`Error acquiring lock ${key}:`, error)
